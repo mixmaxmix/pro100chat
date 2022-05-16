@@ -7,101 +7,167 @@ export default {
       messagesArray: [],
       currentUser: null,
       disabled: true,
-      messageVal: '',
+      messageVal: "",
       currentChat: null,
-      refresh: setInterval(this.getMessages, 15000, this.$route.params.id),
-    }
+      refresh: setInterval(this.getMessages, 10000, this.$route.params.id),
+      router: this.$router.currentRoute.value,
+    };
   },
   methods: {
-    getMessages(id) {
-      this.$router.currentRoute.value.name != 'channel' && clearInterval(this.refresh)
-      axios
+    async getMessages(id) {
+      return axios
         .get(`chats/${id}/messages`, {
           params: {
             page: 0,
-            size: 100,
+            size: 1000,
           },
           headers: {
             Authorization: localStorage.getItem("authToken"),
           },
         })
-        .then(res => {
+        .then((res) => {
           const loader = document.querySelector(".loader");
-          this.messagesArray = res.data.result.content
-          loader.style.display = 'none'
+          this.messagesArray = res.data.result.content;
+          loader.style.display = "none";
+          return true;
         })
-        .catch(error => {
-          console.log(error)
+        .catch((error) => {
+          console.log(error);
+          return false;
         });
     },
-    sendMessage(id) {
-      !this.disabled && 
-      axios
-        .post(`chats/${id}/send`, 
-        {
-          id: this.currentUser,
-          chatId: id,
-          content: this.messageVal,
-        },
-        {
-          headers: {
-            Authorization: localStorage.getItem("authToken"),
+    async sendMessage(id) {
+      this.disabled = true;
+      return axios
+        .post(
+          `chats/${id}/send`,
+          {
+            id: this.currentUser,
+            chatId: id,
+            content: this.messageVal,
           },
-        })
-        .then(res => {
-          this.messageVal = '';
+          {
+            headers: {
+              Authorization: localStorage.getItem("authToken"),
+            },
+          }
+        )
+        .then((res) => {
+          this.messageVal = "";
+          this.disabled = false;
           this.getMessages(id);
+          return true;
         })
-        .catch(error => {
-          console.log(error)
-        })
+        .catch((error) => {
+          console.log(error);
+          return false;
+        });
+    },
+    // Александра Дмитриевна, простите за этот говнокод, но я хочу быстрее сдать :c
+    async scrollDown(id) {
+      if (!this.validateVal(this.messageVal)) {
+        let success = await this.sendMessage(id);
+        let refreshSuccess = await this.getMessages(id);
+        if (success && refreshSuccess) {
+          let messagesList = document.querySelector(".messagesContainer");
+          messagesList.scrollTo({
+            top: messagesList.scrollHeight,
+            behavior: "smooth",
+          });
+        } else {
+          console.log("error");
+        }
+      } else {
+        let refreshSuccess = await this.getMessages(id);
+        if (refreshSuccess) {
+          let messagesList = document.querySelector(".messagesContainer");
+          messagesList.scrollTo({
+            top: messagesList.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }
+    },
+    validateVal(val) {
+      return (this.disabled = val === null || val.match(/^ *$/) !== null);
+    },
+    backToChannels() {
+      this.$router.push("/");
     },
   },
   computed: {
     displayMessanges() {
       let messagesArray = this.messagesArray;
-      return messagesArray.reverse()
-    }
+      return messagesArray.reverse();
+    },
   },
   watch: {
     messageVal(val) {
-      this.disabled =  val === null || val.match(/^ *$/) !== null;
+      this.validateVal(val);
     },
-    messagesArray(val, oldVal) {
-      if(val.length !== oldVal.length) {
-        let messagesList = document.querySelector(".messagesContainer")
-        messagesList.scrollTo({
-          top: messagesList.scrollHeight,
-        })
-      }
-    }
   },
   mounted() {
-    this.currentUser = localStorage.getItem('userId');
-    this.currentChat = this.$route.params.id
-    this.getMessages(this.currentChat);
-  }
+    this.currentUser = localStorage.getItem("userId");
+    this.currentChat = this.$route.params.id;
+    this.scrollDown(this.currentChat);
+    !localStorage.getItem("authToken") && this.$router.push("/");
+  },
+  unmounted() {
+    clearInterval(this.refresh);
+  },
 };
 </script>
 
 <template>
   <div class="chatContainer">
     <header class="chatHeader">
-      <h3>{{this.$route.params.channelName ? this.$route.params.channelName : 'Чат:' }}</h3>
+      <div class="chatHeaderBackContainer" @click="backToChannels">
+        <div class="chatHeaderBack"></div>
+        <h3>
+          {{
+            this.$route.params.channelName
+              ? this.$route.params.channelName
+              : "Чат:"
+          }}
+        </h3>
+      </div>
     </header>
     <ul class="messagesContainer">
-      <li class="messageElement" :class="{ currentUserMessageContainer: message.createdBy.id == currentUser }" v-for="message in displayMessanges" :key="message.id">
-        <p class="currentUserMessage messageText" v-if="message.createdBy.id == currentUser">{{message.content}}</p>
+      <li
+        class="messageElement"
+        :class="{
+          currentUserMessageContainer: message.createdBy.id == currentUser,
+        }"
+        v-for="message in displayMessanges"
+        :key="message.id"
+      >
+        <p
+          class="currentUserMessage messageText"
+          v-if="message.createdBy.id == currentUser"
+        >
+          {{ message.content }}
+        </p>
         <div class="message" v-else>
-          <p class="nickname">{{message.createdBy.username}}</p>
-          <p class="messageText">{{message.content}}</p>
+          <p class="nickname">{{ message.createdBy.username }}</p>
+          <p class="messageText">{{ message.content }}</p>
         </div>
       </li>
       <div class="loader"></div>
     </ul>
     <footer class="newMessageContainer">
-      <input v-model="messageVal" class="messageInput" type="text" placeholder="Сообщение" @keypress.enter="sendMessage(currentChat)" >
-      <button class="messageSend" title="Отправить" @click="sendMessage(currentChat)" :disabled='disabled'></button>
+      <input
+        v-model="messageVal"
+        class="messageInput"
+        type="text"
+        placeholder="Сообщение"
+        @keypress.enter="!this.disabled && scrollDown(currentChat)"
+      />
+      <button
+        class="messageSend"
+        title="Отправить"
+        @click="!this.disabled && scrollDown(currentChat)"
+        :disabled="disabled"
+      ></button>
     </footer>
   </div>
 </template>
@@ -132,7 +198,7 @@ export default {
   background-color: var(--darkGreen);
 }
 .currentUserMessage::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 15px;
   height: 15px;
@@ -181,7 +247,7 @@ export default {
   padding: 24px;
   border: none;
   cursor: pointer;
-  transition: .2s;
+  transition: 0.2s;
   transition-property: background-color, border-color;
   border-top: 1px solid var(--black);
 }
@@ -209,7 +275,7 @@ export default {
   background-color: var(--blue);
 }
 .message::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 15px;
   height: 15px;
@@ -226,5 +292,23 @@ export default {
 .messageText {
   word-break: break-word;
 }
-
+.chatHeaderBack {
+  background: url(@/assets/arrow.svg) center center / cover;
+  width: 12px;
+  height: 24px;
+  transform: rotate(180deg);
+  border: none;
+  margin-right: 10px;
+}
+.chatHeaderBackContainer:hover {
+  filter: invert(52%) sepia(96%) saturate(733%) hue-rotate(117deg)
+    brightness(94%) contrast(99%);
+  cursor: pointer;
+  transition: 0.2s filter;
+}
+.chatHeaderBackContainer {
+  display: flex;
+  align-content: center;
+  justify-content: center;
+}
 </style>

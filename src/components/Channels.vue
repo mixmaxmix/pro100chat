@@ -10,6 +10,7 @@ export default {
       openCreateModal: false,
       channelValue: '',
       disabled: true,
+      refresh: setInterval(this.getChannels, 300000),
     };
   },
   components: {
@@ -68,8 +69,6 @@ export default {
   },
   mounted() {
     this.getChannels();
-    let refresh = setInterval(this.getChannels, 300000);
-    this.$router.currentRoute.value.name != 'channels' && clearInterval(refresh)
     this.username = localStorage.getItem("username");
     !localStorage.getItem("authToken") && this.$router.push("/");
   },
@@ -77,6 +76,9 @@ export default {
     channelValue(val) {
       val.length == 0 ? this.disabled = true : this.disabled = false;
     }
+  },
+  unmounted() {
+    clearInterval(this.refresh);
   }
 };
 </script>
