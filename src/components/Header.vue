@@ -31,7 +31,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 20px 35%;
+  padding: 20px 30vw;
 }
 .headerLogo {
   width: 47px;

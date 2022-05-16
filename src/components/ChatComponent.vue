@@ -9,10 +9,12 @@ export default {
       disabled: true,
       messageVal: '',
       currentChat: null,
+      refresh: setInterval(this.getMessages, 15000, this.$route.params.id),
     }
   },
   methods: {
     getMessages(id) {
+      this.$router.currentRoute.value.name != 'channel' && clearInterval(this.refresh)
       axios
         .get(`chats/${id}/messages`, {
           params: {
@@ -33,6 +35,7 @@ export default {
         });
     },
     sendMessage(id) {
+      !this.disabled && 
       axios
         .post(`chats/${id}/send`, 
         {
@@ -46,8 +49,8 @@ export default {
           },
         })
         .then(res => {
-          this.getMessages(id);
           this.messageVal = '';
+          this.getMessages(id);
         })
         .catch(error => {
           console.log(error)
@@ -62,15 +65,21 @@ export default {
   },
   watch: {
     messageVal(val) {
-      val.length == 0 ? this.disabled = true : this.disabled = false;
+      this.disabled =  val === null || val.match(/^ *$/) !== null;
+    },
+    messagesArray(val, oldVal) {
+      if(val.length !== oldVal.length) {
+        let messagesList = document.querySelector(".messagesContainer")
+        messagesList.scrollTo({
+          top: messagesList.scrollHeight,
+        })
+      }
     }
   },
   mounted() {
     this.currentUser = localStorage.getItem('userId');
     this.currentChat = this.$route.params.id
     this.getMessages(this.currentChat);
-    let refresh = setInterval(this.getMessages, 15000, this.currentChat)
-    this.$router.currentRoute.value.name != 'channel' && clearInterval(refresh)
   }
 };
 </script>
@@ -81,14 +90,17 @@ export default {
       <h3>{{this.$route.params.channelName ? this.$route.params.channelName : 'Чат:' }}</h3>
     </header>
     <ul class="messagesContainer">
-      <li v-for="message in displayMessanges" :key="message.id">
-        <p class="currentUserMessage" v-if="message.createdBy.id == currentUser">{{message.content}}</p>
-        <p v-else>{{message.content}}</p>
+      <li class="messageElement" :class="{ currentUserMessageContainer: message.createdBy.id == currentUser }" v-for="message in displayMessanges" :key="message.id">
+        <p class="currentUserMessage messageText" v-if="message.createdBy.id == currentUser">{{message.content}}</p>
+        <div class="message" v-else>
+          <p class="nickname">{{message.createdBy.username}}</p>
+          <p class="messageText">{{message.content}}</p>
+        </div>
       </li>
       <div class="loader"></div>
     </ul>
     <footer class="newMessageContainer">
-      <input v-model="messageVal" class="messageInput" type="text" placeholder="Сообщение">
+      <input v-model="messageVal" class="messageInput" type="text" placeholder="Сообщение" @keypress.enter="sendMessage(currentChat)" >
       <button class="messageSend" title="Отправить" @click="sendMessage(currentChat)" :disabled='disabled'></button>
     </footer>
   </div>
@@ -112,9 +124,24 @@ export default {
   padding: 10px 20px;
 }
 .currentUserMessage {
-  color: red;
+  position: relative;
+  color: var(--white);
+  padding: 10px;
+  margin: 15px 10px;
+  max-width: 70%;
+  background-color: var(--darkGreen);
+}
+.currentUserMessage::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  background: url(@/assets/current-triangle.svg) center center / cover;
+  right: 0;
+  bottom: -15px;
 }
 .messagesContainer {
+  height: 500px;
   overflow: hidden;
   overflow-y: scroll;
 }
@@ -167,4 +194,37 @@ export default {
 .messageInput:focus ~ .messageSend {
   border-top-color: var(--darkGreen);
 }
+.messageElement {
+  display: flex;
+}
+.currentUserMessageContainer {
+  justify-content: flex-end;
+}
+.message {
+  position: relative;
+  color: var(--white);
+  padding: 10px;
+  margin: 15px 10px;
+  max-width: 70%;
+  background-color: var(--blue);
+}
+.message::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  background: url(@/assets/triangle.svg) center center / cover;
+  left: 0;
+  bottom: -15px;
+}
+.nickname {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 5px;
+}
+.messageText {
+  word-break: break-word;
+}
+
 </style>
