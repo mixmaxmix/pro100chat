@@ -105,6 +105,9 @@ export default {
     messageVal(val) {
       this.validateVal(val);
     },
+    messagesArray(val, oldVal) {
+      val.length !== oldVal.length && this.scrollDown(this.currentChat);
+    }
   },
   mounted() {
     this.currentUser = localStorage.getItem("userId");
